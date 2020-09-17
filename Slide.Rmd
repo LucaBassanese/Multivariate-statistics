@@ -1,0 +1,490 @@
+---
+title: "Presentazione"
+author: "Zoidberg"
+date: "19 aprile 2018"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+```{r echo=FALSE, warning=FALSE, results='hide',message=FALSE}
+setwd("C:\\Users\\Luca\\Desktop\\LUCA\\SCUOLA\\Magistrale Stat\\Statistica Multivariata\\Codici\\DatasetMulti")
+dati=read.table("incomemod.txt", sep=",")
+
+library(MASS)
+library(car)
+library(cvTools)
+library(ROSE)
+library(corrplot)
+library(ggplot2)
+library(ggcorrplot)
+library(tree)
+library(rmarkdown)
+library(lsr)#pacchetto in cui è presente la funzione cramersV
+library(gridExtra)#pacchetto che consente di affiancare più ggplot
+library(dummies)
+library(animation)
+```
+
+##Missing
+
+```{r echo=FALSE, warning=FALSE, results='hide',message=FALSE}
+nomi=c("age", "workclass","fnlwgt", "education", "education.num", "marital.status", "occupation", "relationship", "race", "sex",
+       "capital.gain", "capital.loss", "hours.per.week", "native.country", "income")
+names(dati)=nomi#nominiamo le variabili
+str(dati)
+summary(dati)#notiamo la presenza di " ?" che corrispondono a missing
+dati[dati==" ?"]=NA
+income=na.omit(dati)#eliminiamo i missing
+
+levels(income$native.country)= list(Others=c(" South", " ?"),
+                                    Asia=c(" China"," India"," Iran"," Philippines"," Taiwan"," Japan"," Laos"," Cambodia"," Thailand"),
+                                    NorthAmerica=c(" Canada"," United-States", " Mexico"),
+                                    CenterAmerica=c(" Cuba"," Dominican-Republic"," Guatemala"," Haiti"," Honduras"," Jamaica"," Puerto-Rico"," El-Salvador"),    
+                                    SouthAmerica=c(" Ecuador"," Peru"," Columbia"),
+                                    Europe=c(" France"," Germany"," Italy"," Poland"," Portugal"," Scotland"," England"," Yugoslavia"),
+                                    Oceania=c(" Outlying-US(Guam-USVI-etc)"))
+
+set.seed(123)
+ids0 <- which(income$income==" <=50K")
+ids1 <-which(income$income==" >50K")
+N_TOT <- length(ids1)
+ids0_income <- sample(ids0, N_TOT, rep=F)#poichè il dataset ha poche osservazioni, teniamo tutte le osservazioni con income " >50K"
+ids1_income<- sample(ids1, N_TOT, rep=F)
+zoi=income[c(ids0_income,ids1_income),]
+
+#eliminiamo la modalità " ?" dai levels delle variabili categoriali
+a=as.matrix(zoi$workclass)
+a=as.factor(a)
+zoi$workclass=a
+a=as.matrix(zoi$education)
+a=as.factor(a)
+zoi$education=a
+a=as.matrix(zoi$marital.status)
+a=as.factor(a)
+zoi$marital.status=a
+a=as.matrix(zoi$occupation)
+a=as.factor(a)
+zoi$occupation=a
+a=as.matrix(zoi$relationship)
+a=as.factor(a)
+zoi$relationship=a
+a=as.matrix(zoi$race)
+a=as.factor(a)
+zoi$race=a
+a=as.matrix(zoi$sex)
+a=as.factor(a)
+zoi$sex=a
+a=as.matrix(zoi$native.country)
+a=as.factor(a)
+zoi$native.country=a
+```
+
+##Analisi esplorative
+###Variabili quantitative
+- Correlazione
+- Boxplot e densità
+
+###Variabili qualitative 
+- Associazione
+- Istogrammi
+
+##Grafico a dispersione
+```{r, cache=TRUE}
+pairs(zoi[, c(1,3,5,11,12,13)], col=zoi$income)
+```
+
+##Correlazione
+
+```{r cache=TRUE}
+C <- cor(zoi[,c(1,3,5,11,12,13)])#tolgo le variabili qualitative e la variabile risposta
+ggcorrplot(C, hc.order = TRUE, 
+           type = "lower", 
+           lab = TRUE, 
+           lab_size = 3, 
+           method="circle", 
+           colors = c("tomato2", "white", "springgreen3"), 
+           title="Correlogram", 
+           ggtheme=theme_bw)#dal grafico si deduce che non c'è correlazione
+
+```
+
+
+##Istogrammi e densità
+###Età
+
+```{r cache=TRUE, fig.height=4, fig.width=4}
+plot(zoi[,1]~zoi$income, xlab="Income", ylab="Age",col=c("indianred1", "cyan3"), main="Older people earn more")
+ggplot(zoi, aes(x = age, color = income, fill = income)) +
+  geom_density(alpha = 0.8) +
+  labs(x = "Age", y = "Density",
+       subtitle = "Density plot")
+
+
+```
+
+***
+
+###Educazione
+
+```{r cache=TRUE, fig.height=4, fig.width=4}
+plot(zoi[,5]~zoi$income, xlab="Income", ylab="education-num", outline=F,col=c("indianred1", "cyan3"), main="People with more education earn more")
+ggplot(zoi, aes(x = education.num, color = income, fill = income)) +
+  geom_density(alpha = 0.8) +
+  labs(x = "Education.num", y = "Density",
+       subtitle = "Density plot")
+```       
+ 
+***
+
+###Ore lavorative  
+       
+```{r cache=TRUE, fig.height=4, fig.width=4}      
+plot(zoi[,13]~zoi$income, xlab="Income", ylab="hours-per-week", outline=F, col=c("indianred1", "cyan3"), main="People work more earn more")
+ggplot(zoi, aes(x = hours.per.week, color = income, fill = income)) +
+  geom_density(alpha = 0.8) +
+  labs(x = "Hours.per.week", y = "Density", 
+       subtitle = "Density plot")
+```
+
+***
+
+###Fnlwgt
+
+```{r cache=TRUE, fig.height=4, fig.width=4}
+plot(zoi[,3]~zoi$income, xlab="Income", ylab="fnlwgt", outline=F,col=c("indianred1", "cyan3"), main= "Independence between fnlwgt and income")
+ggplot(zoi, aes(x = fnlwgt, color = income, fill = income)) +
+  geom_density(alpha = 0.8) +
+  labs(x = "Fnlwgt", y = "Density", 
+       subtitle = "Density plot")
+#si può eliminare, 
+#perchè non c'è chiara distinzione tra le distribuzioni condizionate alla risposta
+```
+
+***
+
+###Profitti e perdite
+
+```{r cache=TRUE, fig.height=4, fig.width=4}
+plot(zoi[,11]~zoi$income, xlab="Income", ylab="capital-gain",col=c("indianred1", "cyan3"), main="Distribution around 0")# si elimina perchè entrambe le distribuzioni condizionate sono schiacciate in 0
+plot(zoi[,12]~zoi$income, xlab="Income", ylab="capital-loss",col=c("indianred1", "cyan3"))# si elimina perchè entrambe le distribuzioni condizionate sono schiacciate in 0
+zoi=zoi[,-c(3,11,12)]#abbiamo eliminato le variabili non significative
+```
+
+***
+###Eliminiamo education.num
+```{r, cache=TRUE}
+boxplot(zoi[,4]~zoi$education, xlab="Education", ylab="Education.num") #100% correlazione teniamo solo il qualitativo, perchè più consona al tipo di analisi
+##ordino i livelli in senso crescente 
+ordered_levels <- levels(zoi$education)[c(14,4,5,6,7,1,2,3,12,16,9,8,10,13,15,11)]
+zoi$education <- factor(zoi$education, ordered_levels)
+zoi=zoi[,-4]
+
+```
+
+
+##Associazione
+###V di Cramer
+$$V=\sqrt {\frac{\chi^2}{nt}}$$
+
+- Forse si può scrivere qualcosa
+- Non troppo lungo
+- non so tipo:
+- Misura associazione
+
+```{r echo=FALSE, warning=FALSE, results='hide',error=FALSE, cache=TRUE}
+zoinominal=zoi[,-c(1,9,11)]#crea un dataset solo con le variabili qualitative
+cramercorr=matrix(ncol = ncol(zoinominal), nrow=ncol(zoinominal))
+nomi <- names(zoinominal)
+colnames(cramercorr)=rownames(cramercorr)=nomi
+for(i in 1:ncol(cramercorr))
+{for(j in 1:ncol(cramercorr))
+{cramercorr[i,j]=cramersV(table(zoinominal[,i],zoinominal[,j]))}
+  }#usiamo la V di Cramer per studiare le correlazioni tra variabili qualitative
+  
+```
+
+
+##Associazione
+
+```{r cache=TRUE, fig.height=6, fig.width=6}
+ggcorrplot(cramercorr, hc.order = TRUE, 
+           type = "lower", 
+           lab = TRUE, 
+           lab_size = 3, 
+           method="circle", 
+           colors = c("tomato2", "white", "springgreen3"), 
+           title="Associations", 
+           ggtheme=theme_bw
+           )+
+  scale_fill_gradientn(colours=c( "yellow", "violet"),na.value = "transparent",
+                       breaks=c(0,0.5,1),
+                       limits=c(0,1))
+```
+
+
+##Istogrammi
+
+###Settore di impiego
+
+```{r, fig.height=4, fig.widht=4, cache=TRUE}
+g <- ggplot(zoi, aes(income)) 
+
+a=g + geom_bar(aes(fill=workclass), width = 0.5)  + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+  labs(title="Income across workclass") 
+
+b=ggplot(zoi, aes(x = workclass, fill = income, color = income)) +
+  geom_bar(alpha = 0.8, position = "fill") +
+  coord_flip() +
+  labs(x = "Workclass", y = "Proportion", title = "Income bias \n based on workclass")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+grid.arrange(a,b, ncol=2)
+```
+
+***
+###Educazione
+
+
+```{r, fig.height=4, fig.widht=4, cache=TRUE}
+a=g + geom_bar(aes(fill=education), width = 0.5)  + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+  labs(title="Income \n across education") 
+
+b=ggplot(zoi, aes(x = education, fill = income, color = income)) +
+  geom_bar(alpha = 0.8, position = "fill") +
+  coord_flip() +
+  labs(x = "Education", y = "Proportion", title = "Income bias \n based on education", subtitle="People with more education earn more")+
+  theme(plot.title = element_text(hjust = 0.5))
+grid.arrange(a,b, ncol=2)
+```
+
+***
+
+###Stato civile
+
+```{r, fig.height=4, fig.widht=4, cache=TRUE}
+a=g + geom_bar(aes(fill=marital.status), width = 0.5)  + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+  labs(title="Income across marital-status") 
+
+b=ggplot(zoi, aes(x =marital.status, fill = income, color = income)) +
+  geom_bar(alpha = 0.8, position = "fill") +
+  coord_flip() +
+  labs(x = "Marital.status", y = "Proportion", title = "Income bias \n based on marital.status")+
+  theme(plot.title = element_text(hjust = 0.5))
+grid.arrange(a,b, ncol=2)
+```
+
+***
+###Occupazione
+```{r, fig.height=4, fig.widht=4, cache=TRUE}
+a=g + geom_bar(aes(fill= occupation), width = 0.5)  + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+  labs(title="Income \n across occupation") 
+
+b=ggplot(zoi, aes(x = occupation, fill = income, color = income)) +
+  geom_bar(alpha = 0.8, position = "fill") +
+  coord_flip() +
+  labs(x = "Occupation", y = "Proportion", title = "Income bias \n based on occupation")+
+  theme(plot.title = element_text(hjust = 0.5))
+grid.arrange(a,b, ncol=2)
+```
+
+***
+
+###Relazione
+```{r, fig.height=4, fig.widht=4, cache=TRUE}
+a=g + geom_bar(aes(fill=relationship), width = 0.5)  + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+  labs(title="Income across relationship") 
+
+b=ggplot(zoi, aes(x = relationship, fill = income, color = income)) +
+  geom_bar(alpha = 0.8, position = "fill") +
+  coord_flip() +
+  labs(x = "Relationship", y = "Proportion", title = "Income bias \n based on relationship", 
+       subtitle="Married people earn more")+ theme(plot.title = element_text(hjust = 0.5))
+grid.arrange(a,b, ncol=2)
+```
+
+***
+###Etnia
+
+```{r, fig.height=4, fig.widht=4,cache=TRUE}
+a=g + geom_bar(aes(fill=race), width = 0.5)  + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+  labs(title="Income across race")  
+
+b=ggplot(zoi, aes(x = race, fill = income, color = income)) +
+  geom_bar(alpha = 0.8, position = "fill") +
+  coord_flip() +
+  labs(x = "Race", y = "Proportion", title = "Income bias \n based on race")+
+  theme(plot.title = element_text(hjust = 0.5))
+grid.arrange(a,b, ncol=2)
+```
+
+***
+###Sesso
+```{r, fig.height=4, fig.widht=4, cache=TRUE}
+a=g + geom_bar(aes(fill=sex), width = 0.5)  + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+  labs(title="Income across sex") 
+
+b=ggplot(zoi, aes(x = sex, fill = income, color = income)) +
+  geom_bar(alpha = 0.8, position = "fill") +
+  coord_flip() +
+  labs(x = "Sex", y = "Proportion", title = "Income bias \n based on sex", 
+       subtitle="Men earn more than women") + theme(plot.title = element_text(hjust = 0.5))
+grid.arrange(a,b, ncol=2)
+```
+
+##Credici
+
+<p align="center">
+  <img src="https://media.giphy.com/media/3o6wrqpZb2jz5QmdDG/giphy.gif"/>
+</p>
+
+
+
+***
+
+###Paese di origine
+
+```{r, fig.height=4, fig.widht=4, cache=TRUE}
+a=g + geom_bar(aes(fill=native.country), width = 0.5)  + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) + 
+  labs(title="Income across native-country")
+
+b=ggplot(zoi, aes(x = native.country, fill = income, color = income)) +
+  geom_bar(alpha = 0.8, position = "fill") +
+  coord_flip() +
+  labs(x = "Native.country", y = "Proportion", title = "Income bias \n based on native.country")+
+  theme(plot.title = element_text(hjust = 0.5))
+grid.arrange(a,b, ncol=2)
+```
+
+##Analisi definitive
+
+```{r echo=FALSE, results= 'hide'}
+set.seed(999)
+#train e test equilibrati
+ids=sample(1:nrow(zoi),round(nrow(zoi)*0.6),replace = F)
+train=zoi[ids,]
+test=zoi[-ids,]
+
+#train e test disequilibrati
+ids=sample(1:nrow(income), round(nrow(income)*0.6), replace = F)
+train.dis=income[ids,][, -c(3,5,11,12)]
+test.dis=income[-ids,]
+test.dis=test.dis[, -c(3,5,11,12)]
+train.dis
+```
+
+###Albero massimo equilibrato
+```{r echo=FALSE, fig.height=4, fig.widht=8  }
+fit_tree <- tree(income~., data=train,
+                 control=tree.control(nrow(train), mindev=0, mincut=7, minsize=14), 
+                 split="gini")
+plot(fit_tree, col="brown")
+text(fit_tree, cex=0.5, col="darkgreen")
+
+```
+
+***
+
+```{r echo=FALSE, results='hide'}
+Accuratezza=matrix(, nrow=summary(fit_tree)$size, ncol=3)
+colnames(Accuratezza)=c("Auc", "Prop. corretta class.(train)", "Prop. corretta class.(test.dis)")
+for(i in 2: summary(fit_tree)$size){
+obj_pruned <- prune.tree(fit_tree, best=i)
+prev <- predict(obj_pruned, newdata=test, type="class")
+Accuratezza[i,1] <- roc.curve(test$income, prev, add=T, col=2, plotit = F)$auc
+prevg <- predict(obj_pruned, newdata=train, type="class")
+Accuratezza[i,2]=sum(diag(table(prevg, train$income)))/nrow(train)
+prevdis <- predict(obj_pruned, newdata=test.dis, type="class")
+Accuratezza[i,3]=sum(diag(table(prevdis, test.dis$income)))/nrow(test.dis)
+}
+Accuratezza
+
+```
+
+##Potatura
+
+<p align="center">
+  <img src="potaturaequi.gif"/>
+</p>
+
+###Albero potato
+
+```{r, fig.height=6, fig.widht=6}
+obj_pruned <- prune.tree(fit_tree, best=2)
+plot(obj_pruned, col="brown")
+text(obj_pruned, cex=1, col="darkgreen")
+
+```
+
+***
+
+###Albero massimo disequilibrato
+
+
+```{r, fig.height=4, fig.widht=8}
+fit_tree_dis <- tree(income~., data=train.dis,
+                 control=tree.control(nrow(train.dis), mindev=0, mincut=7, minsize=14), 
+                 split="gini")
+plot(fit_tree_dis, col="brown")
+text(fit_tree_dis, cex=0.5, col="darkgreen")
+```
+
+
+```{r, echo=FALSE, results='hide'}
+Accuratezzadis=matrix(, nrow=summary(fit_tree_dis)$size, ncol=3)
+colnames(Accuratezzadis)=c( "AUC", "Prop. corretta class.(train)","Accuratezza" )
+for(i in 2: summary(fit_tree_dis)$size){
+  obj_pruned <- prune.tree(fit_tree_dis, best=i)
+  prev <- predict(obj_pruned, newdata=test.dis, type="class")
+  Accuratezzadis[i,1] <- roc.curve(test.dis$income, prev, add=T, col=2, plotit = F)$auc
+  prevg <- predict(obj_pruned, newdata=train.dis, type="class")
+  Accuratezzadis[i,2]=sum(diag(table(prevg, train.dis$income)))/nrow(train.dis)
+  prevdis <- predict(obj_pruned, newdata=test.dis, type="class")
+  Accuratezzadis[i,3]=sum(diag(table(prevdis, test.dis$income)))/nrow(test.dis)
+}
+Accuratezzadis
+```
+
+
+##Potatura
+
+<p align="center">
+  <img src="potaturadisequi.gif"/>
+</p>
+
+***
+###Albero potato
+
+
+```{r, fig.height=6, fig.widht=6}
+obj_pruned_dis <- prune.tree(fit_tree_dis, best=5)
+plot(obj_pruned_dis, col="brown")
+text(obj_pruned_dis, cex=0.8, col="darkgreen")
+
+```
+
+##Conclusioni
+
+-  bla bla bla
+- bla bla
+- bla
+
+
+
+##Fine
+
+<p align="center">
+<img src="https://media.giphy.com/media/lD76yTC5zxZPG/giphy.gif"  />
+<p align="center">
+
